@@ -1,0 +1,84 @@
+#encoding:utf-8
+import os
+from datetime import datetime
+from ftplib import FTP
+
+
+TargetDir = ["E:\\test", "E:\\test2"]
+TargetFile = ["QuickFix.dll","ZDTradeClient.exe","CommonClassLib.dll","FIX42.xml"]
+Path = []
+File = []
+
+def ScanDir(targetdir):
+    """
+    用于读取出所有的通讯相应路径
+    :param targetdir:通讯所在的文件路径
+    :return:返回所有的通讯路径到变量列表Path内
+    """
+    for dir in targetdir:
+        os.chdir(dir)
+        for newroot, newdirs, newfiles in os.walk(dir, topdown=False):
+            for newname in newfiles:
+                if newname == "ZDTradeClient.exe":
+                    Path.append(newroot)
+
+
+def file_rename(path):
+    """
+    用于把指定路径下的CME通讯的指定文件进行重命名
+    :param path: 通讯的路径
+    :return: 无返回
+    """
+    for i in path:
+        os.chdir(i)
+        for newroot, newdirs, newfiles in os.walk("."):
+            for dir in newdirs:
+                if  dir.lower() == 'config':
+                    config = os.path.join(newroot, dir)
+                    os.chdir(config)
+                    for newroot1, newdirs1, newfiles1 in os.walk("."):
+                        for file1 in newfiles1:
+                            if file1 in (TargetFile):
+                                newname1 = datetime.now().strftime('%Y%m%d') + '_' + file1
+                                os.rename(os.path.join(newroot1, file1), os.path.join(newroot1, newname1))
+
+
+            for file in newfiles:
+                if file in (TargetFile):
+                    newname2 = datetime.now().strftime('%Y%m%d') + '_' + file
+                    os.rename(os.path.join(i, file), os.path.join(i, newname2))
+
+
+
+def downloadfile(path,file_list):
+        for file in file_list:
+            if file.lower()=='config':
+                ftp.cwd('config')
+                for fs in ftp.nlst():
+                    with open(path + '\\config\\' + fs, 'wb') as f1:
+                        filename = 'RETR ' + fs
+                        ftp.retrbinary(filename, f1.write)
+                        ftp.cwd('..')
+            else:
+                with open(path+'\\'+file, 'wb') as f:
+                    filename = 'RETR ' + file
+                    ftp.retrbinary(filename, f.write)
+
+
+
+
+ScanDir(TargetDir)
+file_rename(Path)
+ftp = FTP('30.0.0.2')
+ftp.login('deploy','deploy!@#456')
+print(ftp.getwelcome())
+ftp.cwd('deploy')
+root_list = ftp.nlst()
+
+if 'Com' in root_list:
+    ftp.cwd('Com')
+    for p in Path:
+            downloadfile(p, ftp.nlst())
+    print("finished")
+
+ftp.quit()
