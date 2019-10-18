@@ -1,0 +1,94 @@
+# -*- coding: utf-8 -*-
+import os
+import psutil
+from datetime import datetime
+from ftplib import FTP
+import shutil
+
+TargetPro = "CMEMarketAdapter"
+FtpTargetFile = "CME_Market"
+TargetDirs = []
+Path = []
+File = []
+
+
+def scan_dir(targetdir):
+    """
+    用于读取出所有的channel相应路径
+    :param targetdir:channel所在的文件路径
+    :return:返回所有的channel路径到变量列表Path内
+    """
+    for dir in targetdir:
+        os.chdir(dir)
+        for newroot, newdirs, newfiles in os.walk(dir, topdown=False):
+            for newname in newfiles:
+                if newname == TargetPro:
+                    Path.append(newroot)
+
+
+def get_proc(pname,list):
+    for proc in psutil.process_iter():
+        try:
+            if proc.name().lower().find(pname.lower()):
+                list.append(proc.cwd())
+        except psutil.AccessDenied:
+            pass
+        except psutil.NoSuchProcess:
+            pass
+
+def update_file(dirs,ftpfile):
+    ftp.cwd(ftpfile)
+    for dir in dirs:
+        try:
+            os.chdir(dir)
+            bak_path = dir + os.sep + 'old' + os.sep + datetime.now().strftime('%Y%m%d') + os.sep
+            if not os.path.exists(bak_path):
+                os.makedirs(bak_path)
+            for file in ftp.nlst():
+                if os.path.isdir(file):
+                    pass
+                elif os.path.splitext(file)[-1] == ".config":
+                    pass
+                else:
+                    try:
+                        file_move(dir, bak_path, file)
+                        file_download(dir, file)
+                    except IOError:
+                        print("{path1} 下的 {file1} 文件更新失败".format(path1=dir, file1=file))
+            print("{} 程序已更新".format(dir))
+        except:
+            print("{} 程序更新失败".format(dir))
+    print("All Done~")
+
+
+
+def file_move(target_path,bak_path,file):
+    try:
+        shutil.move(target_path + os.sep + file, bak_path + file)
+    except FileNotFoundError:
+            print('old {} not found'.format(file))
+    #print('{} move finished'.format(file))
+
+
+def file_download(target_path,file):
+    try:
+        with open(target_path + '\\' + file, 'wb') as f:
+            filename = 'RETR ' + file
+            ftp.retrbinary(filename, f.write)
+    except IOError:
+        print("Error:对 {} 下的程序文件更新失败，请调查 ".format(target_path))
+
+
+
+
+
+
+
+ftp = FTP('127.0.0.1)
+ftp.login('deploy','123456')
+print(ftp.getwelcome())
+get_proc(TargetPro,TargetDirs)
+ftp.cwd('deploy')
+update_file(TargetDirs,FtpTargetFile)
+ftp.quit()
+
