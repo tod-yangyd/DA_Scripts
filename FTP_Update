@@ -9,6 +9,7 @@ TargetPro = "CMEMarketAdapter"
 FtpTargetFile = "CME_Market"
 config={'StatisticsDataResetTime':'<add key="StatisticsDataResetTime" value="" />'}
 TargetDirs = []
+targetFile = "channel"
 Path = []
 File = []
 
@@ -28,14 +29,18 @@ def scan_dir(targetdir):
 
 
 def get_proc(pname,list):
+    templist=[]
     for proc in psutil.process_iter():
         try:
             if proc.name().lower().__contains__(pname.lower()):
-                list.append(proc.cwd())
+                templist.append(proc.cwd())
         except psutil.AccessDenied:
             pass
         except psutil.NoSuchProcess:
             pass
+    for dir in templist:
+        if dir.lower().__contains__(targetFile):
+            list.append(dir)
 
 def update_file(dirs,ftpfile):
     ftp.cwd(ftpfile)
