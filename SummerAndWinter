@@ -1,0 +1,129 @@
+# -*- coding: utf-8 -*-
+import  psutil
+import  re
+import datetime
+from datetime import timedelta
+
+targetProcess=['StartStopTool']
+stopToolpath=[]
+targetFile=[]
+wintertime='06:30:00'
+summertime='05:30:00'
+
+def get_proc(pname,list):
+
+    for proc in psutil.process_iter():
+        try:
+            if proc.name().lower().__contains__(pname.lower()):
+                list.append(proc.cwd())
+        except psutil.AccessDenied:
+            pass
+        except psutil.NoSuchProcess:
+            pass
+
+def get_weekapp(txt):
+    """
+    正则表达式用于获取配置项中周启动的描述
+    :param txt:
+    :return:
+    """
+    reg = re.compile(r'<add key="App.*" value="(.*.exe)" />')
+    return re.findall(reg, txt)
+
+def get_dayapp(txt):
+    """
+    正则表达式用于获取配置项中周启动的描述
+    :param txt:
+    :return:
+    """
+    reg = re.compile(r'<add key="DayApp.*" value="(.*.exe)" />')
+    return re.findall(reg, txt)
+
+def modify_config(paths):
+    try:
+        for path in paths:
+            with open(path + "\\" + "StartStopTool.exe.config", 'r+', encoding='utf8') as f1:
+                t_text = f1.readlines()
+                f1.seek(0)
+                f1.truncate()
+                f1.close()
+            with open(path + "\\" + "StartStopTool.exe.config", 'r+', encoding='utf8') as f2:
+                for i in t_text:
+                    # 匹配周启动的具体配置
+                    if re.search(r'<add key="App.*" value="(.*.exe)" />', i):
+                        # 匹配设置生效状态的配置
+                        if 'ON' in i:
+                            list_split = i.split(';')
+                            split_result = list_split[1].split(',')
+                            if split_result[1] == '1':
+                                time = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                                # 如果设置时间比夏令时晚半小时以上且设置时间在冬令时半小时内，说明此时是冬令时，则触发修改至夏令时
+                                if time - stime > timedelta(minutes=30) and time - wtime < timedelta(minutes=30):
+                                    time -= timedelta(hours=1)
+                                    split_result[2] = time.strftime('%H:%M:%S')
+                                    list_split[1] = ",".join(split_result)
+                                    f2.write(";".join(list_split))
+                                    continue
+                                # 如果设置时间在夏令时半小时内，说明此时是夏令时，则触发修改至冬令时
+                                elif time - stime < timedelta(minutes=30):
+                                    time += timedelta(hours=1)
+                                    split_result[2] = time.strftime('%H:%M:%S')
+                                    list_split[1] = ",".join(split_result)
+                                    f2.write(";".join(list_split))
+                                    continue
+                                else:
+                                    f2.write(i)
+                                    continue
+
+                            else:
+                                f2.write(i)
+                                continue
+                        else:
+                            f2.write(i)
+                            continue
+                    elif re.search(r'<add key="DayApp.*" value="(.*.exe)" />',i):
+                        # 匹配设置生效状态的配置
+                        if 'ON' in i:
+                            list_split = i.split(';')
+                            split_result = list_split[1].split(',')
+                            endtime=datetime.datetime.strptime(split_result[1], '%H:%M:%S')
+                            starttime = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                            #判断日关闭时间如果接近夏令时时间
+                            if endtime-stime<timedelta(minutes=30):
+                                endtime += timedelta(hours=1)
+                                split_result[1] = endtime.strftime('%H:%M:%S')
+                            elif endtime-stime>timedelta(minutes=30) and endtime-wtime<timedelta(minutes=30):
+                                endtime -= timedelta(hours=1)
+                                split_result[1] = endtime.strftime('%H:%M:%S')
+
+                            if starttime-stime<timedelta(minutes=30):
+                                starttime += timedelta(hours=1)
+                                split_result[2] = starttime.strftime('%H:%M:%S')
+                            elif starttime-stime>timedelta(minutes=30) and starttime-wtime<timedelta(minutes=30):
+                                starttime -= timedelta(hours=1)
+                                split_result[2] = starttime.strftime('%H:%M:%S')
+
+                            list_split[1] = ",".join(split_result)
+                            f2.write(";".join(list_split))
+                            continue
+                        else:
+                            f2.write(i)
+                            continue
+                    else:
+                        f2.write(i)
+                f2.close()
+            print(path +" 路径下的周自启动已调整")
+    except Exception as alert:
+        print(alert)
+
+
+
+if __name__ == '__main__':
+    stime = datetime.datetime.strptime(summertime, '%H:%M:%S')
+    wtime = datetime.datetime.strptime(wintertime, '%H:%M:%S')
+    for t in targetProcess:
+        get_proc(t, stopToolpath)
+    if stopToolpath:
+        modify_config(stopToolpath)
+    print("自启动调整完成")
+
