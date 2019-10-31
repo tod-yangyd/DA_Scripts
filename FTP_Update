@@ -40,7 +40,9 @@ def get_proc(pname,list):
         except psutil.NoSuchProcess:
             pass
     for dir in templist:
-        if dir.lower().__contains__(targetFile):
+        if dir.lower().__contains__("quick"):
+            continue
+        elif dir.lower().__contains__(targetFile) :
             list.append(dir)
 
 def update_file(dirs,ftpfile):
