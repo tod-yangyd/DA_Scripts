@@ -7,25 +7,34 @@ from datetime import timedelta
 import sys
 import subprocess as sp
 
-targetProcess=['StartStopTool']
-stopToolpath=[]
+targetProcess=['StartStopTool','ZDMarketDispatcher']
+#StartStopTool=[]
+#ZDMarketDispatcher=[]
+diction={'StartStopTool':[],'ZDMarketDispatcher':[]}
 wintertime='06:30:00'
 summertime='05:30:00'
-def get_proc(pname,list):
-
-    for proc in psutil.process_iter():
-        try:
-            if proc.name().lower().__contains__(pname.lower()):
-                list.append(proc.cwd())
-        except psutil.AccessDenied:
-            pass
-        except psutil.NoSuchProcess:
-            pass
+def get_proc(list):
+    for l in diction.keys():
+        for proc in psutil.process_iter():
+            try:
+                if proc.name().lower().__contains__(l.lower()):
+                    #if proc.name()
+                    diction[l].append(proc.cwd())
+            except psutil.AccessDenied:
+                pass
+            except psutil.NoSuchProcess:
+                pass
 
 def start_process(list):
-    for l in list:
-        command=l+'\StartStopTool.exe'
-        sp.Popen(command,shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+    try:
+        for l in list:
+            command = l + '\StartStopTool.exe'
+            sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+            print(l + " 路径下的自启动已启动")
+
+    except Exception as alert:
+        print(alert)
+
 
 def modify_config_summer(paths):
     try:
@@ -107,7 +116,6 @@ def modify_config_summer(paths):
     except Exception as alert:
         print(alert)
 
-
 def modify_config_winter(paths):
     try:
         for path in paths:
@@ -188,23 +196,89 @@ def modify_config_winter(paths):
     except Exception as alert:
         print(alert)
 
+def Market_summer(paths):
+    try:
+        for path in paths:
+            with open(path + "\\" + "ZDMarketDispatcher.exe.config", 'r+', encoding='utf8') as f1:
+                t_text = f1.readlines()
+                f1.seek(0)
+                f1.truncate()
+                f1.close()
+            with open(path + "\\" + "ZDMarketDispatcher.exe.config", 'r+', encoding='utf8') as f2:
+                for i in t_text:
+                    # 匹配周启动的具体配置
+                    if re.search(r'<add key="BeforeStockOpenTime".* />', i):
+                        split_list=i.split(';')
+                        time_split=split_list[1].split(',')
+                        old_time=datetime.datetime.strptime(time_split[2], '%H:%M:%S')
+                        new_time=old_time+timedelta(hours=1)
+                        time_split[2]=new_time.strftime('%H:%M:%S')
+                        split_list[1]=(',').join(time_split)
+                        f2.write((';').join(split_list))
+                    else:
+                        f2.write(i)
+
+    except Exception as alert:
+        print(alert)
+
+def Market_winter(paths):
+    try:
+        for path in paths:
+            with open(path + "\\" + "ZDMarketDispatcher.exe.config", 'r+', encoding='utf8') as f1:
+                t_text = f1.readlines()
+                f1.seek(0)
+                f1.truncate()
+                f1.close()
+            with open(path + "\\" + "ZDMarketDispatcher.exe.config", 'r+', encoding='utf8') as f2:
+                for i in t_text:
+                    # 匹配周启动的具体配置
+                    if re.search(r'<add key="BeforeStockOpenTime".* />', i):
+                        split_list=i.split(';')
+                        time_split=split_list[1].split(',')
+                        old_time=datetime.datetime.strptime(time_split[2], '%H:%M:%S')
+                        new_time=old_time-timedelta(hours=1)
+                        time_split[2]=new_time.strftime('%H:%M:%S')
+                        split_list[1]=(',').join(time_split)
+                        f2.write((';').join(split_list))
+                    else:
+                        f2.write(i)
+
+    except Exception as alert:
+        print(alert)
+
+
 
 if __name__ == '__main__':
     stime = datetime.datetime.strptime(summertime, '%H:%M:%S')
     wtime = datetime.datetime.strptime(wintertime, '%H:%M:%S')
-    for t in targetProcess:
-        get_proc(t, stopToolpath)
-    if stopToolpath:
-        if sys.argv[1]=='summer':
-            modify_config_summer(stopToolpath)
-            print("自启动 夏令时至冬令时 调整完成")
-        elif sys.argv[1]=='winter':
-            modify_config_winter(stopToolpath)
-            print("自启动 冬令时至夏令时 调整完成")
+    get_proc(targetProcess)
+    #更新自启动
+    if diction['StartStopTool']:
+        if len(sys.argv)>1:
+            if sys.argv[1] == 'summer':
+                modify_config_summer(diction['StartStopTool'])
+                print("自启动 夏令时至冬令时 调整完成")
+            elif sys.argv[1] == 'winter':
+                modify_config_winter(diction['StartStopTool'])
+                print("自启动 冬令时至夏令时 调整完成")
+            os.system('taskkill /F /IM StartStopTool.exe')
+            print("自启动已关闭")
+            start_process(diction['StartStopTool'])
         else:
-            print ("error:参数错误，请重新执行")
-    os.system('taskkill /F /IM StartStopTool.exe')
-    print("自启动已关闭")
-    start_process(stopToolpath)
-    print("自启动已重启")
+            print ("Error:参数错误，请重新执行")
+
+
+
+    #更新股票二级行情
+    if diction['ZDMarketDispatcher']:
+        if len(sys.argv)>1:
+            if sys.argv[1] == 'summer':
+                Market_summer(diction['ZDMarketDispatcher'])
+                print("股票二级行情 夏令时至冬令时 调整完成")
+            elif sys.argv[1] == 'winter':
+                Market_winter(diction['ZDMarketDispatcher'])
+                print("股票二级行情 冬令时至夏令时 调整完成")
+        else:
+            print ("Stock Error:参数错误，请重新执行")
+
 
