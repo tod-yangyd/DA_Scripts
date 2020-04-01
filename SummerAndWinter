@@ -3,6 +3,7 @@ import  psutil
 import  re
 import datetime
 import os
+import time
 from datetime import timedelta
 import sys
 import subprocess as sp
@@ -31,6 +32,7 @@ def start_process(list):
             command = l + '\StartStopTool.exe'
             sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
             print(l + " 路径下的自启动已启动")
+            time.sleep(1)
 
     except Exception as alert:
         print(alert)
@@ -54,6 +56,13 @@ def modify_config_summer(paths):
                             split_result = list_split[1].split(',')
                             if split_result[1] == '1':
                                 time = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                                # 如果是易盛一级，则直接修改
+                                if 'EsunnyMarket' in list_split[3]:
+                                    time += timedelta(hours=1)
+                                    split_result[2] = time.strftime('%H:%M:%S')
+                                    list_split[1] = ",".join(split_result)
+                                    f2.write(";".join(list_split))
+                                    continue
                                 # 如果设置时间比5:30早，则说明此时是夏令时
                                 if (time-stime).days<0 :
                                     time += timedelta(hours=1)
@@ -85,6 +94,15 @@ def modify_config_summer(paths):
                             split_result = list_split[1].split(',')
                             endtime=datetime.datetime.strptime(split_result[1], '%H:%M:%S')
                             starttime = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                            # 单独判断，如果是易盛一级，则直接修改
+                            if 'EsunnyMarket' in list_split[3]:
+                                endtime += timedelta(hours=1)
+                                split_result[1] = endtime.strftime('%H:%M:%S')
+                                starttime += timedelta(hours=1)
+                                split_result[2] = starttime.strftime('%H:%M:%S')
+                                list_split[1] = ",".join(split_result)
+                                f2.write(";".join(list_split))
+                                continue
                             # 判断关闭时间早于夏令时时间，则说明处于夏令时设置
                             if (endtime - stime).days < 0:
                                 endtime += timedelta(hours=1)
@@ -97,11 +115,11 @@ def modify_config_summer(paths):
                             # 判断启动时间早于夏令时时间，则说明处于夏令时设置
                             if (starttime - stime).days < 0:
                                 starttime += timedelta(hours=1)
-                                split_result[1] = starttime.strftime('%H:%M:%S')
+                                split_result[2] = starttime.strftime('%H:%M:%S')
                             # 判断启动时间晚于夏令时，且在30分钟内，则处于夏令时
                             elif (starttime - stime).seconds / 60 <= 30:
                                 starttime += timedelta(hours=1)
-                                split_result[1] = starttime.strftime('%H:%M:%S')
+                                split_result[2] = starttime.strftime('%H:%M:%S')
 
                             list_split[1] = ",".join(split_result)
                             f2.write(";".join(list_split))
@@ -134,6 +152,13 @@ def modify_config_winter(paths):
                             split_result = list_split[1].split(',')
                             if split_result[1] == '1':
                                 time = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                                # 如果遇到易盛一级，则直接修改
+                                if 'EsunnyMarket' in list_split[3]:
+                                    time -= timedelta(hours=1)
+                                    split_result[2] = time.strftime('%H:%M:%S')
+                                    list_split[1] = ",".join(split_result)
+                                    f2.write(";".join(list_split))
+                                    continue
                                 # 如果设置时间大于等于6:00，小于6：30，说明此时是冬令时，则触发修改至夏令时
                                 if (time-stime).days==0 and 30 <= (time-stime).seconds/60 < 60:
                                     time -= timedelta(hours=1)
@@ -165,6 +190,15 @@ def modify_config_winter(paths):
                             split_result = list_split[1].split(',')
                             endtime=datetime.datetime.strptime(split_result[1], '%H:%M:%S')
                             starttime = datetime.datetime.strptime(split_result[2], '%H:%M:%S')
+                            # 如果遇到易盛一级，则直接修改
+                            if 'EsunnyMarket' in list_split[3]:
+                                endtime -= timedelta(hours=1)
+                                split_result[1] = endtime.strftime('%H:%M:%S')
+                                starttime -= timedelta(hours=1)
+                                split_result[2] = starttime.strftime('%H:%M:%S')
+                                list_split[1] = ",".join(split_result)
+                                f2.write(";".join(list_split))
+                                continue
                             #判断关闭时间晚于6点，早上6点半，处于冬令时
                             if (endtime-stime).days==0 and 30< (endtime-stime).seconds/60 <60:
                                 endtime -= timedelta(hours=1)
@@ -177,11 +211,11 @@ def modify_config_winter(paths):
                             #判断启动时间晚于6点，早上6点半，处于冬令时
                             if (starttime-stime).days==0 and 30< (starttime-stime).seconds/60 <60:
                                 starttime -= timedelta(hours=1)
-                                split_result[1] = starttime.strftime('%H:%M:%S')
+                                split_result[2] = starttime.strftime('%H:%M:%S')
                             #判断启动时间晚于6点半，早于7点，处于冬令时
                             elif (starttime-stime).days==0 and 60< (starttime-stime).seconds/60 <90:
                                 starttime -= timedelta(hours=1)
-                                split_result[1] = starttime.strftime('%H:%M:%S')
+                                split_result[2] = starttime.strftime('%H:%M:%S')
 
                             list_split[1] = ",".join(split_result)
                             f2.write(";".join(list_split))
@@ -255,14 +289,15 @@ if __name__ == '__main__':
     #更新自启动
     if diction['StartStopTool']:
         if len(sys.argv)>1:
-            if sys.argv[1] == 'summer':
+            if sys.argv[1].lower() == 'summer':
                 modify_config_summer(diction['StartStopTool'])
                 print("自启动 夏令时至冬令时 调整完成")
-            elif sys.argv[1] == 'winter':
+            elif sys.argv[1].lower() == 'winter':
                 modify_config_winter(diction['StartStopTool'])
                 print("自启动 冬令时至夏令时 调整完成")
             os.system('taskkill /F /IM StartStopTool.exe')
             print("自启动已关闭")
+            time.sleep(3)
             start_process(diction['StartStopTool'])
         else:
             print ("Error:参数错误，请重新执行")
@@ -280,5 +315,10 @@ if __name__ == '__main__':
                 print("股票二级行情 冬令时至夏令时 调整完成")
         else:
             print ("Stock Error:参数错误，请重新执行")
+
+
+
+
+
 
 
